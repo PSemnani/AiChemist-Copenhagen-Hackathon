@@ -31,8 +31,8 @@ See each task's `instruction.md` for the full brief and an inference example.
 
 ## Submission format
 
-One CSV **per model** (two submissions total), with a single `smiles` column and **1000 rows**,
-ordered most-confident first (row 1 = the molecule you are most confident was in the training data).
+Add your molecules to the following spreadsheet: https://docs.google.com/spreadsheets/d/10x8vqq9sOj6gjPoUxh_aINKpqZX0MTCxUkjkLWxiXBY/edit?gid=0#gid=0
+Please only ever modify your teams tab (column A for task 1 and column B for task 2). Every half hour (XX:00 and XX:30) the submissions for both tasks will be evaluated and the results are displayed in the leaderboard tab.
 
 ## Runtime dependencies
 
