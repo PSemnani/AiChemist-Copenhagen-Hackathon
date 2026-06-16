@@ -1,0 +1,35 @@
+{
+  "task": "Multiclass classification (4 classes).",
+  "classes": [
+    "class_0",
+    "class_1",
+    "class_2",
+    "class_3"
+  ],
+  "input_representation": {
+    "type": "ECFP4 (Morgan)",
+    "radius": 2,
+    "n_bits": 2048,
+    "dtype": "float32 0/1"
+  },
+  "architecture": "MLP 2048 -> [Linear+BN+ReLU+Dropout(0.3)] 512 -> 256 -> 4",
+  "training": {
+    "loss": "class-weighted cross-entropy (inverse-frequency)",
+    "optimizer": "AdamW",
+    "learning_rate": 0.001,
+    "weight_decay": 0.0001,
+    "batch_size": 128,
+    "early_stopping": "val loss, patience 20",
+    "best_epoch": 4,
+    "best_val_loss": 0.3482057750225067,
+    "seed": 0
+  },
+  "test_metrics": {
+    "accuracy": 0.8570159857904085,
+    "balanced_accuracy": 0.8678309869402306,
+    "macro_f1": 0.8137963488889586,
+    "weighted_f1": 0.8649795835698769,
+    "macro_roc_auc_ovr": 0.9665050729411251
+  },
+  "weights_format": "safetensors (load with safetensors.torch.load_file; no pickle)"
+}
