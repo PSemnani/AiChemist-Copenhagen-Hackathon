@@ -114,3 +114,29 @@ def test_prior_log_prob_is_differentiable(mock_agent):
     loss.backward()
     grads = [p.grad for p in mock_agent.rnn.parameters() if p.grad is not None]
     assert len(grads) > 0
+
+
+# ── Task 6: Explore — gradient attribution ────────────────────────────────────
+import importlib.util as _ilu
+from pathlib import Path as _Path
+
+def _load_task2_model():
+    _ROOT = _Path(__file__).parent.parent
+    spec = _ilu.spec_from_file_location(
+        "task2_m",
+        _ROOT / "tasks" / "task-2" / "model" / "model.py"
+    )
+    mod = _ilu.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    model = mod.load_model(str(_ROOT / "tasks" / "task-2" / "model" / "model.safetensors"))
+    model.eval()
+    return model
+
+def test_top_bits_for_class_returns_correct_length():
+    from solution.explore import top_bits_for_class
+    model = _load_task2_model()
+    bits = top_bits_for_class(model, class_idx=0, topk=20)
+    assert isinstance(bits, list)
+    assert len(bits) == 20
+    assert all(isinstance(b, int) for b in bits)
+    assert all(0 <= b < 2048 for b in bits)
