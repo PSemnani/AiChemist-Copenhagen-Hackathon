@@ -15,41 +15,13 @@ Experiment 3 (certainty): |logit_class0 - logit_class1| — molecules
 the model is most decisive about are most likely training members.
 """
 import argparse
-import importlib.util
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import torch
-from rdkit import Chem
-from rdkit.Chem import rdFingerprintGenerator
 
-ROOT = Path(__file__).parent.parent.parent
-_gen = rdFingerprintGenerator.GetMorganGenerator(radius=2, fpSize=2048)
-
-
-def load_model(task_num: int):
-    spec = importlib.util.spec_from_file_location(
-        f"task{task_num}_model",
-        ROOT / "tasks" / f"task-{task_num}" / "model" / "model.py",
-    )
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    model = mod.load_model(
-        str(ROOT / "tasks" / f"task-{task_num}" / "model" / "model.safetensors")
-    )
-    model.eval()
-    return model
-
-
-def featurize(smiles_list: list[str]) -> tuple[list[np.ndarray], list[str]]:
-    fps, valid = [], []
-    for smi in smiles_list:
-        mol = Chem.MolFromSmiles(str(smi))
-        if mol:
-            fps.append(_gen.GetFingerprintAsNumPy(mol).astype("float32"))
-            valid.append(smi)
-    return fps, valid
+from solution.screening.utils import ROOT, load_model, featurize
 
 
 def screen(
