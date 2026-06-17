@@ -5,3 +5,7 @@ models/transformer/models/weights/*.ckpt
 __pycache__/
 .pixi/
 .DS_Store
+data/chembl_smiles.tsv
+models/transformer/alphabets.zip
+models/transformer/models.zip
+models/transformer/models/weights/
