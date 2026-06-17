@@ -1,46 +1,104 @@
-# Hackathon Copenhagen
+# AiChemist Copenhagen Hackathon
 
-## The task
-- Recover (reconstruct) the molecules each model was trained on.
-- For each model (task-1 and task-2) you should submit a set of 1000 molecules that you think were in the training data.
+**Task:** Given two pre-trained molecular classifiers, reconstruct the molecules they were trained on — without access to the training data.
 
+## The Problem
 
+Two MLP models classify molecules using ECFP4 fingerprints (Morgan, radius 2, 2048 bits):
 
-## Repository layout
-- Each model is in the tasks subfolders 
+| Task | Type | Train acc | Test acc | Signal |
+|---|---|---|---|---|
+| Task 1 | Binary (class 0 / class 1) | ~1.000 | ~0.652 | Overfit — memorized training data |
+| Task 2 | 4-class | ~0.898 | ~0.857 | Regularized — generalizes well |
+
+Submit 1000 molecules per task that match the training set as closely as possible.
+
+## Our Approach
+
+### What We Tried
+
+**Approach 1 — Generative (REINVENT RL):** Use a pre-trained SMILES generator steered by the model's confidence via REINFORCE. Generates novel drug-like molecules. Produced 0 correct matches — the prior generates valid molecules but not the specific training molecules.
+
+**Approach 2 — Dataset Screening (winner):** Screen known molecule databases and rank by the model's raw logit signal.
+
+### The Key Insight: Raw Logit as a Membership Signal
+
+Softmax confidence saturates at 1.0 for all drug-like molecules — useless for discrimination. Raw logits keep full dynamic range:
 
 ```
-tasks/<task>/
-  instruction.md   # the task brief + an example inference snippet
-  model/           # self-contained bundle: weights + model definition + config.json
+ChEMBL (2.85M molecules):  max logit ≈ 10   →  0/1000 correct
+CARBIDE (cardiotoxicity):  max logit ≈ 27   →  60+ correct
+hERG dataset (38K mols):   max logit ≈ 66   →  best results
 ```
 
+The 6× logit gap between the wrong dataset (ChEMBL) and the right one (hERG) is the model "remembering" molecules it trained on. An overfit model pushes the logit for memorized inputs toward very large values.
 
-## The challenges
+**Selection criterion (Experiment 3 — certainty):**
+```
+certainty = |logit_class0 - logit_class1|
+```
+The most decisive predictions correspond to the most strongly memorized molecules.
 
-| task | what it is |
-|---|---|
-| [`tasks/task-1/`](tasks/task-1/instruction.md) | **Binary classifier** — an overfit model|
-| [`tasks/task-2/`](tasks/task-2/instruction.md) | **4-class classifier** — a realistic, regularized model |
+### Dataset Discovery
 
-Both models share the same input representation: **ECFP4** (RDKit Morgan fingerprint,
-radius 2, 2048 bits) and ship as **safetensors** bundles. Each bundle's `featurize_smiles`
-handles the ECFP4 conversion for you, so there is no need to reimplement it.
-See each task's `instruction.md` for the full brief and an inference example.
+Training data is from the **hERG channel bioactivity dataset** — hERG is the cardiac potassium channel whose blockage causes drug-induced cardiotoxicity (the biological theme of both tasks). This connects to the **CARBIDE dataset** (cardiotoxicity, 3K molecules) which we discovered first via logit magnitude comparison.
 
+## Repository Structure
 
-## Submission format
+```
+tasks/                     # Given by organizers — model weights + code
+  task-1/model/            # Binary MLP: 2048 → 512 → 128 → 2
+  task-2/model/            # 4-class MLP: 2048 → [BN+ReLU+Dropout] 512 → 256 → 4
 
-Add your molecules to the following spreadsheet: https://docs.google.com/spreadsheets/d/10x8vqq9sOj6gjPoUxh_aINKpqZX0MTCxUkjkLWxiXBY/edit?gid=0#gid=0
-Please only ever modify your teams tab (column A for task 1 and column B for task 2). Every half hour (XX:00 and XX:30) the submissions for both tasks will be evaluated and the results are displayed in the leaderboard tab.
+solution/
+  generative/              # Approach 1: REINVENT RL pipeline
+    prior.py               # SMILES LSTM wrapper (load, sample, log_prob)
+    scoring.py             # ECFP4 scoring functions
+    rl_loop.py             # REINFORCE training loop
+    explore.py             # Phase 1: prior baseline + RL probe
+    run_task1.py           # Entry point: Task 1 (1 agent)
+    run_task2.py           # Entry point: Task 2 (4 agents × 250)
+  screening/               # Approach 2: Dataset screening (successful)
+    screen.py              # Unified screener — any CSV → ranked submissions
+    fingerprint_inversion.py  # Gradient descent + Tanimoto lookup
 
-## Runtime dependencies
+results/
+  best/                    # Final submissions (highest leaderboard scores)
+    task1_hERG_certainty.csv
+    task2_hERG_certainty.csv
+  experiments/             # All intermediate attempts (reference)
 
-Loading and running the models needs `torch`, `rdkit`, `safetensors`, and `numpy`. The
-`pixi.toml` file pins compatible versions, and `pixi install` is the easiest way to get them.
-If you have never used pixi and are interested in it, check out https://pixi.prefix.dev/latest/.
-Of course you can also use your own package management tool if you don't want to use pixi.
+tests/                     # Unit tests for generative pipeline (27 tests)
+docs/                      # Design spec and implementation plan
+models/transformer/        # brsynth ECFP4→SMILES Transformer tokens
+```
 
+## Running the Screening Pipeline
 
-After you have your environment, see the task `instruction.md` for a runnable snippet for each model.
+```bash
+# Install dependencies
+pixi install
 
+# Screen any molecule dataset (CSV with SMILES column)
+PYTHONPATH=. pixi run python solution/screening/screen.py \
+    --data path/to/molecules.csv \
+    --smiles-col SMILES \
+    --output results/best/
+```
+
+## Running the Generative Pipeline
+
+```bash
+# Phase 1: validate signal quality (~2 min)
+PYTHONPATH=. pixi run python solution/generative/explore.py
+
+# Phase 2: generate molecules (requires models/reinvent.prior)
+PYTHONPATH=. pixi run python solution/generative/run_task1.py  # ~10 min
+PYTHONPATH=. pixi run python solution/generative/run_task2.py  # ~40 min
+```
+
+## Dependencies
+
+Managed via [pixi](https://pixi.sh): `pixi install`
+
+Core: `torch`, `rdkit`, `safetensors`, `numpy`, `pandas`, `scikit-learn`

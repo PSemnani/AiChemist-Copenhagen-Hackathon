@@ -1,11 +1,19 @@
+# Large data files
+data/chembl_smiles.tsv
 models/*.prior
 models/transformer/*.zip
-models/transformer/models/weights/*.ckpt
-*.pyc
-__pycache__/
-.pixi/
-.DS_Store
-data/chembl_smiles.tsv
-models/transformer/alphabets.zip
-models/transformer/models.zip
 models/transformer/models/weights/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# OS
+.DS_Store
+
+# Pixi environment
+.pixi/
+pixi.lock
+data/
