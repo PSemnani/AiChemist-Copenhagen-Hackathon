@@ -2,7 +2,7 @@
 
 ## The task
 - Recover (reconstruct) the molecules each model was trained on.
-- For each model (task-1 and task-2) you should submit an ordered list of 1000 molecules that you think were in the training data. Order them by your confidence (For position 1 you are more confident that it was in the training data than for position 2 etc.)
+- For each model (task-1 and task-2) you should submit a set of 1000 molecules that you think were in the training data.
 
 
 
