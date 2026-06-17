@@ -117,20 +117,34 @@ class Prior:
         """
         Log-likelihood for each SMILES. Shape: (n,).
         Differentiable w.r.t. rnn parameters when rnn.requires_grad=True.
-        Invalid / unencodable SMILES get log_prob = 0 (as a detached scalar).
+        Invalid SMILES get log_prob=0; if ALL are invalid a differentiable
+        zero is returned so loss.backward() never crashes in the RL loop.
         """
-        log_probs = []
+        log_probs: List[Optional[torch.Tensor]] = []
+        has_valid = False
         for smi in smiles_list:
             indices = self.vocabulary.encode(smi)
             if indices is None or len(indices) < 2:
-                log_probs.append(torch.tensor(0.0, device=self.device))
+                log_probs.append(None)
                 continue
             x = torch.tensor(indices[:-1], dtype=torch.long, device=self.device).unsqueeze(0)
             y = torch.tensor(indices[1:], dtype=torch.long, device=self.device)
             logits, _ = self.rnn(x)               # (1, T, vocab_size)
             lp = logits[0].log_softmax(-1)         # (T, vocab_size)
             log_probs.append(lp[range(len(y)), y].sum())
-        return torch.stack(log_probs)
+            has_valid = True
+
+        if not has_valid:
+            # All invalid: return a differentiable zero so backward() won't crash
+            dummy = torch.zeros(1, 1, dtype=torch.long, device=self.device)
+            anchor = self.rnn(dummy)[0].sum() * 0.0   # grad_fn, value=0
+            return anchor.expand(len(smiles_list))
+
+        # Mix: valid entries have grad_fn; None slots get plain zeros.
+        # torch.stack keeps requires_grad=True as long as one entry has it.
+        filled = [lp if lp is not None else torch.tensor(0.0, device=self.device)
+                  for lp in log_probs]
+        return torch.stack(filled)
 
 
 def load_prior(path: str, freeze: bool = True) -> "Prior":
@@ -152,7 +166,7 @@ def load_prior(path: str, freeze: bool = True) -> "Prior":
     # First try loading directly (reinvent may be installed)
     try:
         ckpt = torch.load(path, map_location="cpu", weights_only=False)
-    except Exception:
+    except (ModuleNotFoundError, AttributeError, ImportError):
         # Stub reinvent namespace so torch.load can unpickle without full install
         for mod_name in ['reinvent', 'reinvent.models', 'reinvent.models.reinvent',
                          'reinvent.models.reinvent.model', 'reinvent.chemistry',

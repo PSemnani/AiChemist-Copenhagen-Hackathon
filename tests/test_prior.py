@@ -56,7 +56,6 @@ def test_vocabulary_roundtrip(vocab):
 
 # ── Task 3: RNN + Prior tests ─────────────────────────────────────────────────
 from solution.prior import RNN, Prior, get_device
-from copy import deepcopy
 
 
 @pytest.fixture
@@ -66,15 +65,20 @@ def tiny_rnn(vocab):
 
 @pytest.fixture
 def mock_prior(vocab, tiny_rnn):
-    device = torch.device("cpu")
-    return Prior(tiny_rnn, vocab, device)
+    rnn = tiny_rnn
+    rnn.eval()
+    for p in rnn.parameters():
+        p.requires_grad_(False)
+    return Prior(rnn, vocab, torch.device("cpu"))
 
 
 @pytest.fixture
 def mock_agent(vocab):
     rnn = RNN(vocab_size=len(vocab), embed_dim=8, hidden_size=16, num_layers=1)
-    device = torch.device("cpu")
-    return Prior(rnn, vocab, device)
+    rnn.train()
+    for p in rnn.parameters():
+        p.requires_grad_(True)
+    return Prior(rnn, vocab, torch.device("cpu"))
 
 
 def test_rnn_output_shape(tiny_rnn, vocab):
