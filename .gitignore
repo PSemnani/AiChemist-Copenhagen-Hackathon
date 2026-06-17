@@ -5,3 +5,6 @@
 # Python bytecode
 __pycache__/
 *.pyc
+
+# Model weights (large binary files)
+models/*.prior
