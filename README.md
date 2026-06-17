@@ -18,29 +18,6 @@ Two black-box neural networks classify molecules by biological activity. We don'
 
 ---
 
-## Our Journey
-
-### Approach 1 — Generative (didn't work)
-We built a full **REINVENT RL pipeline**: a pre-trained SMILES generator steered toward high-confidence predictions via REINFORCE. Beautiful pipeline, wrong tool — it generates *plausible* molecules, not the *specific* training ones.
-
-### Approach 2 — Membership Inference (worked ✅)
-**The key insight:** softmax confidence is useless — it saturates to 1.0 for all drug-like molecules. **Raw logits** tell a completely different story.
-
-```
-Wrong dataset:   max logit ≈ 10   →  0 / 1000 correct
-Right dataset:   max logit ≈ 66   →  60+ correct
-```
-
-That 6× gap is the model *remembering* molecules it trained on. We used this as a membership signal to identify the training distribution by scanning candidate databases until logits jumped.
-
-**Selection criterion:**
-```
-certainty = | logit_class0 − logit_class1 |
-```
-The more decisive the model, the more likely it memorized that molecule.
-
----
-
 ## Structure
 
 ```
