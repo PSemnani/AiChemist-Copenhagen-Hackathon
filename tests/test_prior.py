@@ -52,3 +52,61 @@ def test_vocabulary_roundtrip(vocab):
         indices = vocab.encode(smi)
         if indices is not None:
             assert vocab.decode(indices) == smi
+
+
+# ── Task 3: RNN + Prior tests ─────────────────────────────────────────────────
+from solution.prior import RNN, Prior, get_device
+from copy import deepcopy
+
+
+@pytest.fixture
+def tiny_rnn(vocab):
+    return RNN(vocab_size=len(vocab), embed_dim=8, hidden_size=16, num_layers=1)
+
+
+@pytest.fixture
+def mock_prior(vocab, tiny_rnn):
+    device = torch.device("cpu")
+    return Prior(tiny_rnn, vocab, device)
+
+
+@pytest.fixture
+def mock_agent(vocab):
+    rnn = RNN(vocab_size=len(vocab), embed_dim=8, hidden_size=16, num_layers=1)
+    device = torch.device("cpu")
+    return Prior(rnn, vocab, device)
+
+
+def test_rnn_output_shape(tiny_rnn, vocab):
+    batch, seq = 4, 10
+    x = torch.randint(0, len(vocab), (batch, seq))
+    logits, hidden = tiny_rnn(x)
+    assert logits.shape == (batch, seq, len(vocab))
+    assert hidden[0].shape[1] == batch   # LSTM hidden state batch dim
+
+
+def test_prior_sample_returns_n_strings(mock_prior):
+    result = mock_prior.sample(n=5)
+    assert len(result) == 5
+    assert all(isinstance(s, str) for s in result)
+
+
+def test_prior_log_prob_shape(mock_prior):
+    smiles = ["CCO", "CC", "invalid!!!xyz"]
+    lp = mock_prior.log_prob(smiles)
+    assert lp.shape == (3,)
+    assert lp.dtype == torch.float32
+
+
+def test_prior_log_prob_invalid_smiles_gets_zero(mock_prior):
+    lp = mock_prior.log_prob(["invalid!!!xyz"])
+    assert lp[0].item() == pytest.approx(0.0)
+
+
+def test_prior_log_prob_is_differentiable(mock_agent):
+    smiles = mock_agent.sample(n=3)
+    lp = mock_agent.log_prob(smiles)
+    loss = -lp.mean()
+    loss.backward()
+    grads = [p.grad for p in mock_agent.rnn.parameters() if p.grad is not None]
+    assert len(grads) > 0
